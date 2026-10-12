@@ -127,6 +127,7 @@ export function createApp(db) {
     const token = randomBytes(32).toString('hex');
     await db.session.create({ data: { id: sessionHash(token), userId: user.id, expiresAt: new Date(Date.now() + 7 * 86400000) } });
     res.setHeader('Set-Cookie', sessionCookie(token));
+    return token;
   }
   app.get('/api/health', async (req, res) => { await db.$queryRaw`SELECT 1`; res.json({ status: 'ok' }); });
   app.post('/api/auth/register', authLimit, async (req, res) => {
@@ -227,8 +228,8 @@ export function createApp(db) {
           locality,
         }
       });
-      await startSession(user, res);
-      res.status(201).json(publicUser(user));
+      const token = await startSession(user, res);
+      res.status(201).json({ ...publicUser(user), token });
     } catch (error) {
       if (error.code === 'P2002') {
         const target = error.meta?.target?.[0];
@@ -248,7 +249,8 @@ export function createApp(db) {
     const fallback = '00000000000000000000000000000000:' + '00'.repeat(64);
     const valid = await verifyPassword(password, user?.passwordHash || fallback);
     if (!user || !valid) return res.status(401).json({ error: 'Email or password is incorrect.' });
-    await startSession(user, res); res.json(publicUser(user));
+    const token = await startSession(user, res);
+    res.json({ ...publicUser(user), token });
   });
   app.get('/api/public/stats', async (req, res) => {
     try {
@@ -275,28 +277,48 @@ export function createApp(db) {
       res.status(500).json({ error: 'Failed to retrieve public statistics.' });
     }
   });
+  const APPROVED_INCIDENT_STATUSES = ['Verified', 'Dispatched', 'Responding', 'Resolved'];
+
   app.get('/api/public/incidents', async (req, res) => {
     try {
       const where = {};
-      if (typeof req.query.hazard === 'string' && req.query.hazard && req.query.hazard !== 'ALL') where.hazard = req.query.hazard;
-      if (typeof req.query.status === 'string' && req.query.status && req.query.status !== 'ALL') {
-        if (req.query.status === 'Rejected') return res.json([]);
-        where.status = req.query.status;
+      const approvedOnly = req.query.approvedOnly === 'true' || req.query.forMap === 'true';
+
+      if (approvedOnly) {
+        if (typeof req.query.status === 'string' && req.query.status && req.query.status !== 'ALL') {
+          if (!APPROVED_INCIDENT_STATUSES.includes(req.query.status)) return res.json([]);
+          where.status = req.query.status;
+        } else {
+          where.status = { in: APPROVED_INCIDENT_STATUSES };
+        }
       } else {
-        where.status = { not: 'Rejected' };
+        if (typeof req.query.status === 'string' && req.query.status && req.query.status !== 'ALL') {
+          if (req.query.status === 'Rejected') return res.json([]);
+          where.status = req.query.status;
+        } else {
+          where.status = { not: 'Rejected' };
+        }
       }
+
+      if (typeof req.query.hazard === 'string' && req.query.hazard && req.query.hazard !== 'ALL') where.hazard = req.query.hazard;
       if (typeof req.query.severity === 'string' && req.query.severity && req.query.severity !== 'ALL') where.severity = req.query.severity;
       if (typeof req.query.province === 'string' && req.query.province && req.query.province !== 'all') where.province = req.query.province;
       if (typeof req.query.district === 'string' && req.query.district) where.district = req.query.district;
+      if (req.query.hasCoordinates === 'true') {
+        where.latitude = { not: null };
+        where.longitude = { not: null };
+      }
+
       const reports = await db.report.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: 50,
+        take: 100,
         select: {
           id: true,
           hazard: true,
           description: true,
           severity: true,
+          priority: true,
           status: true,
           province: true,
           district: true,
@@ -304,6 +326,7 @@ export function createApp(db) {
           ward: true,
           createdAt: true,
           incidentAt: true,
+          verifiedAt: true,
           latitude: true,
           longitude: true,
           area: { select: { id: true, name: true, latitude: true, longitude: true } }
@@ -319,6 +342,67 @@ export function createApp(db) {
       })));
     } catch {
       res.status(500).json({ error: 'Failed to retrieve public incidents.' });
+    }
+  });
+
+  // Dedicated GIS public map telemetry endpoint enforcing approved status and valid coordinates
+  app.get('/api/public/map-incidents', async (req, res) => {
+    try {
+      const where = {
+        latitude: { not: null },
+        longitude: { not: null },
+      };
+
+      if (typeof req.query.status === 'string' && req.query.status && req.query.status !== 'ALL') {
+        if (!APPROVED_INCIDENT_STATUSES.includes(req.query.status)) return res.json([]);
+        where.status = req.query.status;
+      } else {
+        where.status = { in: APPROVED_INCIDENT_STATUSES };
+      }
+
+      if (typeof req.query.hazard === 'string' && req.query.hazard && req.query.hazard !== 'ALL') where.hazard = req.query.hazard;
+      if (typeof req.query.severity === 'string' && req.query.severity && req.query.severity !== 'ALL') where.severity = req.query.severity;
+      if (typeof req.query.province === 'string' && req.query.province && req.query.province !== 'all') where.province = req.query.province;
+      if (typeof req.query.district === 'string' && req.query.district) where.district = req.query.district;
+
+      const reports = await db.report.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        select: {
+          id: true,
+          hazard: true,
+          description: true,
+          severity: true,
+          priority: true,
+          status: true,
+          province: true,
+          district: true,
+          municipality: true,
+          ward: true,
+          createdAt: true,
+          incidentAt: true,
+          verifiedAt: true,
+          latitude: true,
+          longitude: true,
+          area: { select: { id: true, name: true, latitude: true, longitude: true } }
+        }
+      });
+
+      // Filter to strict Nepal geographic boundaries (26.0 - 31.0 N, 80.0 - 89.0 E)
+      const validReports = reports.filter(r =>
+        r.latitude != null && r.longitude != null &&
+        r.latitude >= 26.0 && r.latitude <= 31.0 &&
+        r.longitude >= 80.0 && r.longitude <= 89.0
+      );
+
+      res.json(validReports.map(({ latitude, longitude, ...rest }) => ({
+        ...rest,
+        latitude: Math.round(latitude * 100) / 100,
+        longitude: Math.round(longitude * 100) / 100,
+      })));
+    } catch {
+      res.status(500).json({ error: 'Failed to retrieve public map incidents.' });
     }
   });
   app.use('/api', async (req, res, next) => {

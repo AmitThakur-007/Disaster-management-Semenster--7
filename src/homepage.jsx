@@ -1,6 +1,175 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import './cdw-homepage.css';
 import { DISTRICTS_BY_PROVINCE } from './nepalLocationData.js';
+
+// Configure default Leaflet icon paths in bundled Vite build
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
+
+// Coordinate validation: restricts to geographic bounding box of Nepal
+export function isValidNepalCoordinate(lat, lng) {
+  if (lat == null || lng == null) return false;
+  const nLat = Number(lat);
+  const nLng = Number(lng);
+  return Number.isFinite(nLat) && Number.isFinite(nLng) &&
+    nLat >= 26.0 && nLat <= 31.0 &&
+    nLng >= 80.0 && nLng <= 89.0;
+}
+
+// Authorized incident visibility: public maps must show only incidents approved for public display
+export const APPROVED_MAP_STATUSES = ['Verified', 'Dispatched', 'Responding', 'Resolved'];
+
+export function isApprovedForPublicDisplay(incident) {
+  if (!incident || !incident.status) return false;
+  return APPROVED_MAP_STATUSES.includes(incident.status);
+}
+
+// Spatial fanout helper: subtly separates pins sharing identical ward centroid coordinates
+export function getDisplacedCoordinates(incidents) {
+  const coordGroups = new Map();
+  incidents.forEach(inc => {
+    const lat = Number(inc.latitude);
+    const lng = Number(inc.longitude);
+    const key = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+    if (!coordGroups.has(key)) coordGroups.set(key, []);
+    coordGroups.get(key).push(inc);
+  });
+
+  const resultMap = new Map();
+  coordGroups.forEach((group) => {
+    if (group.length === 1) {
+      resultMap.set(group[0].id, [Number(group[0].latitude), Number(group[0].longitude)]);
+    } else {
+      const radius = 0.0035; // ~380m subtle radial fanout for clear visibility
+      group.forEach((inc, idx) => {
+        const angle = (idx / group.length) * 2 * Math.PI;
+        const dLat = radius * Math.cos(angle);
+        const dLng = (radius / Math.cos(Number(inc.latitude) * Math.PI / 180)) * Math.sin(angle);
+        resultMap.set(inc.id, [Number(inc.latitude) + dLat, Number(inc.longitude) + dLng]);
+      });
+    }
+  });
+  return resultMap;
+}
+
+export function getSeverityColor(severity) {
+  const s = (severity || 'Medium').toLowerCase();
+  switch (s) {
+    case 'critical': return '#dc2626';
+    case 'high': return '#ea580c';
+    case 'medium': return '#d97706';
+    case 'low': return '#059669';
+    default: return '#2563eb';
+  }
+}
+
+export function getHazardEmoji(hazard) {
+  switch (hazard) {
+    case 'Flood':
+    case 'Rising water':
+      return '🌊';
+    case 'Landslide':
+    case 'Land crack':
+      return '⛰️';
+    case 'Earthquake':
+      return '⚡';
+    case 'Fire':
+      return '🔥';
+    case 'Severe storm':
+      return '🌪️';
+    case 'Road accident':
+      return '🚗';
+    default:
+      return '⚠️';
+  }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+export function createIncidentMarkerIcon(inc, isSelected = false) {
+  const color = getSeverityColor(inc.severity);
+  const emoji = getHazardEmoji(inc.hazard);
+  const selectedClass = isSelected ? 'is-selected' : '';
+
+  return L.divIcon({
+    className: 'cdw-leaflet-div-icon',
+    html: `
+      <div class="cdw-leaflet-marker-pin ${selectedClass}" style="--marker-color: ${color};" role="button" aria-label="${escapeHtml(inc.hazard)} marker">
+        <div class="marker-pulse-ring"></div>
+        <div class="marker-badge">
+          <span class="marker-emoji" aria-hidden="true">${emoji}</span>
+        </div>
+        <div class="marker-arrow"></div>
+      </div>
+    `,
+    iconSize: [36, 42],
+    iconAnchor: [18, 40],
+    popupAnchor: [0, -38]
+  });
+}
+
+export function createPopupContent(inc) {
+  const color = getSeverityColor(inc.severity);
+  const loc = escapeHtml(formatIncidentLocation(inc));
+  const hazard = escapeHtml(inc.hazard || 'Emergency Hazard');
+  const status = escapeHtml(inc.status || 'Reported');
+  const severity = escapeHtml(inc.severity || 'Medium');
+  const priority = escapeHtml(inc.priority || 'Normal');
+  const time = formatNepalTime(inc.incidentAt || inc.createdAt);
+  const updatedTime = inc.verifiedAt ? formatNepalTime(inc.verifiedAt) : formatNepalTime(inc.createdAt);
+  const desc = inc.description ? escapeHtml(inc.description.slice(0, 160)) + (inc.description.length > 160 ? '…' : '') : '';
+  const latStr = inc.latitude != null ? Number(inc.latitude).toFixed(2) : '';
+  const lngStr = inc.longitude != null ? Number(inc.longitude).toFixed(2) : '';
+
+  return `
+    <div class="cdw-leaflet-popup">
+      <div class="popup-topbar" style="border-left: 4px solid ${color};">
+        <div class="popup-title-row">
+          <strong class="popup-hazard">${hazard}</strong>
+          <span class="popup-status-pill status-${status.toLowerCase()}">${status}</span>
+        </div>
+        <div class="popup-location-row">
+          <span class="popup-icon">📍</span>
+          <span class="popup-location-text">${loc}</span>
+        </div>
+        ${inc.province ? `<div class="popup-province-badge">${escapeHtml(inc.province)}</div>` : ''}
+      </div>
+
+      ${desc ? `<p class="popup-description">${desc}</p>` : ''}
+
+      <div class="popup-meta-grid font-mono">
+        <div><span>Severity:</span> <strong style="color: ${color};">${severity}</strong></div>
+        <div><span>Priority:</span> <span>${priority}</span></div>
+        <div><span>GPS:</span> <span>${latStr}° N, ${lngStr}° E</span></div>
+        <div class="popup-time-col"><span>Occurred:</span> <span>${time}</span></div>
+        <div class="popup-time-col"><span>Updated:</span> <span>${updatedTime}</span></div>
+      </div>
+
+      <div class="popup-actions-row">
+        <button type="button" class="btn-popup-inspect" data-incident-id="${escapeHtml(inc.id)}">
+          🔍 Inspect Telemetry →
+        </button>
+      </div>
+    </div>
+  `;
+}
 
 // Imported high-fidelity local assets generated for Nepal disaster operations
 import heroImage from './assets/images/hero_nepal_disaster_response_1791542036094.jpg';
@@ -63,14 +232,14 @@ const GRAB_BAG_ITEMS = [
 
 // ── Provinces of Nepal with Coordinates for Map Interactive View ─────────────
 const NEPAL_PROVINCES = [
-  { id: 'all', name: 'All Nepal', center: { lat: 28.3949, lon: 84.1240 }, count: 7 },
-  { id: 'koshi', name: 'Koshi Province', capital: 'Biratnagar', center: { lat: 27.2, lon: 87.2 } },
-  { id: 'madhesh', name: 'Madhesh Province', capital: 'Janakpur', center: { lat: 26.9, lon: 85.9 } },
-  { id: 'bagmati', name: 'Bagmati Province (Kathmandu)', capital: 'Hetauda', center: { lat: 27.7, lon: 85.3 } },
-  { id: 'gandaki', name: 'Gandaki Province', capital: 'Pokhara', center: { lat: 28.2, lon: 84.0 } },
-  { id: 'lumbini', name: 'Lumbini Province', capital: 'Deukhuri', center: { lat: 27.8, lon: 82.5 } },
-  { id: 'karnali', name: 'Karnali Province', capital: 'Birendranagar', center: { lat: 29.3, lon: 82.2 } },
-  { id: 'sudurpashchim', name: 'Sudurpashchim Province', capital: 'Godawari', center: { lat: 29.3, lon: 80.9 } },
+  { id: 'all', name: 'All Nepal', center: { lat: 28.3949, lon: 84.1240 }, count: 7, zoom: 7 },
+  { id: 'koshi', name: 'Koshi Province', capital: 'Biratnagar', center: { lat: 27.2, lon: 87.2 }, zoom: 8 },
+  { id: 'madhesh', name: 'Madhesh Province', capital: 'Janakpur', center: { lat: 26.9, lon: 85.9 }, zoom: 8 },
+  { id: 'bagmati', name: 'Bagmati Province (Kathmandu)', capital: 'Hetauda', center: { lat: 27.7, lon: 85.3 }, zoom: 9 },
+  { id: 'gandaki', name: 'Gandaki Province', capital: 'Pokhara', center: { lat: 28.2, lon: 84.0 }, zoom: 8 },
+  { id: 'lumbini', name: 'Lumbini Province', capital: 'Deukhuri', center: { lat: 27.8, lon: 82.5 }, zoom: 8 },
+  { id: 'karnali', name: 'Karnali Province', capital: 'Birendranagar', center: { lat: 29.3, lon: 82.2 }, zoom: 8 },
+  { id: 'sudurpashchim', name: 'Sudurpashchim Province', capital: 'Godawari', center: { lat: 29.3, lon: 80.9 }, zoom: 8 },
 ];
 
 // ── Location & Formatting Helpers ────────────────────────────────────────────
@@ -330,26 +499,172 @@ export function RedesignedHomepage({
     });
   }, [incidents, filterHazard, filterSeverity, filterStatus, filterProvince, searchQuery]);
 
-  // Coordinate-bearing incidents for GIS map projection
+  // Coordinate-bearing incidents for GIS map projection (strictly validated Nepal coordinates AND approved status)
   const mappedIncidents = useMemo(() => {
-    return filteredIncidents.filter(i => i.latitude != null && i.longitude != null);
+    return filteredIncidents.filter(i => isApprovedForPublicDisplay(i) && isValidNepalCoordinate(i.latitude, i.longitude));
   }, [filteredIncidents]);
 
-  // Bounding box projection for Nepal GIS plot
-  const mapBounds = useMemo(() => {
-    // Nepal approximate boundaries: lat 26.3 to 30.5, lon 80.0 to 88.2
-    return { minLat: 26.2, maxLat: 30.6, minLon: 80.0, maxLon: 88.3 };
+  // Leaflet Map state & references
+  const [tileError, setTileError] = useState(false);
+  const leafletContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersLayerRef = useRef(null);
+  const markersMapRef = useRef(new Map());
+
+  // Initialize Leaflet map with OpenStreetMap tiles
+  useEffect(() => {
+    if (!leafletContainerRef.current || mapInstanceRef.current) return;
+
+    try {
+      const map = L.map(leafletContainerRef.current, {
+        center: [28.3949, 84.1240],
+        zoom: 7,
+        minZoom: 6,
+        maxZoom: 18,
+        zoomControl: false,
+        attributionControl: true
+      });
+
+      L.control.zoom({ position: 'topright' }).addTo(map);
+
+      const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(map);
+
+      tileLayer.on('tileerror', () => setTileError(true));
+      tileLayer.on('load', () => setTileError(false));
+
+      const markersGroup = L.layerGroup().addTo(map);
+      markersLayerRef.current = markersGroup;
+      mapInstanceRef.current = map;
+
+      // Handle popup action button click
+      map.on('popupopen', (e) => {
+        const popupEl = e.popup.getElement();
+        if (popupEl) {
+          const btn = popupEl.querySelector('.btn-popup-inspect');
+          if (btn) {
+            btn.onclick = () => {
+              const id = btn.getAttribute('data-incident-id');
+              const found = incidents.find(i => i.id === id);
+              if (found) {
+                setSelectedIncident(found);
+                const inspector = document.querySelector('.gis-detail-inspector');
+                if (inspector && window.innerWidth < 1024) {
+                  inspector.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+              }
+            };
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Failed to initialize Leaflet incident map:', err);
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markersLayerRef.current = null;
+        markersMapRef.current.clear();
+      }
+    };
   }, []);
 
-  function projectToNepalMap(lat, lon) {
-    const { minLat, maxLat, minLon, maxLon } = mapBounds;
-    const x = ((lon - minLon) / (maxLon - minLon)) * 100;
-    const y = ((maxLat - lat) / (maxLat - minLat)) * 100;
-    return {
-      left: Math.max(4, Math.min(96, x)),
-      top: Math.max(6, Math.min(94, y))
-    };
-  }
+  // Ensure map resizes smoothly when layout or container bounds change
+  useEffect(() => {
+    if (!leafletContainerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    });
+    observer.observe(leafletContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Update Leaflet markers whenever mapped incidents list updates
+  useEffect(() => {
+    if (!mapInstanceRef.current || !markersLayerRef.current) return;
+
+    const markersGroup = markersLayerRef.current;
+    markersGroup.clearLayers();
+    markersMapRef.current.clear();
+
+    const displacedCoords = getDisplacedCoordinates(mappedIncidents);
+
+    mappedIncidents.forEach(inc => {
+      const isSelected = selectedIncident?.id === inc.id;
+      const icon = createIncidentMarkerIcon(inc, isSelected);
+      const coords = displacedCoords.get(inc.id) || [Number(inc.latitude), Number(inc.longitude)];
+      const marker = L.marker(coords, {
+        icon,
+        title: `${inc.hazard} — ${formatIncidentLocation(inc)}`,
+        riseOnHover: true
+      });
+
+      marker.bindPopup(createPopupContent(inc), {
+        className: 'cdw-leaflet-popup-frame',
+        maxWidth: 320,
+        autoPanPadding: [20, 20]
+      });
+
+      marker.on('click', () => {
+        setSelectedIncident(inc);
+      });
+
+      markersGroup.addLayer(marker);
+      markersMapRef.current.set(inc.id, marker);
+
+      if (isSelected) {
+        marker.openPopup();
+      }
+    });
+  }, [mappedIncidents, selectedIncident?.id]);
+
+  // Synchronize map pan & popup when selected incident changes
+  useEffect(() => {
+    if (!selectedIncident || !mapInstanceRef.current) return;
+    const marker = markersMapRef.current.get(selectedIncident.id);
+    if (marker) {
+      marker.openPopup();
+      if (isValidNepalCoordinate(selectedIncident.latitude, selectedIncident.longitude)) {
+        mapInstanceRef.current.panTo([selectedIncident.latitude, selectedIncident.longitude], {
+          animate: true,
+          duration: 0.6
+        });
+      }
+    }
+  }, [selectedIncident]);
+
+  // Map Navigation & View Actions
+  const handleProvinceFocus = useCallback((prov) => {
+    setFilterProvince(prov.id);
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([prov.center.lat, prov.center.lon], prov.zoom || 8, {
+        duration: 0.8
+      });
+    }
+  }, []);
+
+  const handleFitAll = useCallback(() => {
+    if (!mapInstanceRef.current) return;
+    if (mappedIncidents.length > 0) {
+      const bounds = L.latLngBounds(mappedIncidents.map(i => [i.latitude, i.longitude]));
+      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+    } else {
+      mapInstanceRef.current.flyTo([28.3949, 84.1240], 7, { duration: 0.8 });
+    }
+  }, [mappedIncidents]);
+
+  const handleResetNepal = useCallback(() => {
+    setFilterProvince('all');
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([28.3949, 84.1240], 7, { duration: 0.8 });
+    }
+  }, []);
 
   // Ticker bulletin items
   const tickerItems = useMemo(() => {
@@ -920,17 +1235,22 @@ export function RedesignedHomepage({
               <span className="section-kicker kicker-amber">GEOGRAPHIC INFORMATION SYSTEM</span>
               <h2 className="section-heading text-white">Nepal Emergency Incident Map</h2>
               <p className="section-subtext text-slate-300">
-                Topographical coordinate visualization of validated hazards across Nepal.
+                Live topographical incident visualization of validated hazards across Nepal powered by Leaflet &amp; OpenStreetMap.
                 Reports without coordinates are listed in the overview feed and are never plotted at estimated locations.
               </p>
             </div>
             <div className="map-stats-pill">
-              <span className="font-mono">{mappedIncidents.length}</span> of {filteredIncidents.length} active records geolocated
+              <span className="live-dot" aria-hidden="true">●</span>{' '}
+              <span className="font-mono">{mappedIncidents.length}</span> of {filteredIncidents.length} active records geolocated{' '}
+              <span className="stats-divider">/</span>{' '}
+              <span className="map-status-note">
+                {lastUpdated ? `Live (30s poll) · Updated ${new Date(lastUpdated).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kathmandu' })} NPT` : 'Connecting telemetry...'}
+              </span>
             </div>
           </div>
 
           <div className="gis-workspace-grid">
-            {/* Left Column: Interactive Vector Map Canvas */}
+            {/* Left Column: Interactive Leaflet Map Canvas */}
             <div className="gis-map-canvas-card">
               <div className="map-toolbar-bar">
                 <div className="province-quick-filter">
@@ -941,113 +1261,136 @@ export function RedesignedHomepage({
                         key={p.id}
                         type="button"
                         className={`btn-province-tab ${filterProvince === p.id ? 'is-active' : ''}`}
-                        onClick={() => setFilterProvince(p.id)}
+                        onClick={() => handleProvinceFocus(p)}
+                        title={`Focus map on ${p.name}`}
                       >
                         {p.name.split(' ')[0]}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className="map-projection-note font-mono">
-                  WGS 84 • Coordinate Projection
+                <div className="map-view-actions">
+                  <button
+                    type="button"
+                    className="btn-map-control"
+                    onClick={handleFitAll}
+                    title="Fit view to all active incident coordinates"
+                  >
+                    🎯 Fit All
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-map-control"
+                    onClick={handleResetNepal}
+                    title="Reset view to whole Nepal"
+                  >
+                    🇳🇵 Reset
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-map-refresh"
+                    onClick={() => loadData({ silent: false })}
+                    disabled={isRefreshing}
+                    title="Poll latest incident coordinates from database"
+                  >
+                    {isRefreshing ? '↻ Syncing...' : '↻ Refresh'}
+                  </button>
                 </div>
               </div>
 
-              {/* Vector SVG Outline of Nepal with Topographical Himalayan Lines */}
-              <div className="nepal-topographical-wrapper">
-                <svg
-                  viewBox="0 0 680 340"
-                  className="nepal-topographical-svg"
-                  aria-label="Map of Nepal with incident markers"
-                >
-                  <defs>
-                    <linearGradient id="nepalTerrainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#1e293b" />
-                      <stop offset="60%" stopColor="#0f172a" />
-                      <stop offset="100%" stopColor="#020617" />
-                    </linearGradient>
-                    <filter id="pinHoverGlow" x="-30%" y="-30%" width="160%" height="160%">
-                      <feGaussianBlur stdDeviation="4" result="blur" />
-                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                    </filter>
-                  </defs>
+              {/* Leaflet + OpenStreetMap Map Container */}
+              <div className="gis-leaflet-wrapper">
+                <div
+                  ref={leafletContainerRef}
+                  className="gis-leaflet-container"
+                  id="nepal-incident-leaflet-map"
+                  role="region"
+                  aria-label="Interactive Nepal Emergency Incident Map with OpenStreetMap"
+                />
 
-                  {/* Nepal Country Territorial Polygon (Geometrically Proportionate) */}
-                  <path
-                    d="M 45,160 
-                       C 70,120 120,110 180,130 
-                       C 230,120 280,95 350,110 
-                       C 420,115 480,85 540,110 
-                       C 600,125 640,150 655,185 
-                       C 650,225 590,250 530,240 
-                       C 470,255 410,240 340,260 
-                       C 270,265 210,245 150,255 
-                       C 90,245 50,210 45,160 Z"
-                    fill="url(#nepalTerrainGrad)"
-                    stroke="#334155"
-                    strokeWidth="2"
-                  />
+                {/* Tile warning banner if network is slow or OSM tiles are restricted */}
+                {tileError && (
+                  <div className="map-tile-warning" role="alert">
+                    <span>⚠️ OpenStreetMap tiles are loading slowly. All geolocated hazard records remain plotted.</span>
+                    <button type="button" onClick={() => setTileError(false)} aria-label="Dismiss notice">✕</button>
+                  </div>
+                )}
 
-                  {/* Himalayan Range Contours */}
-                  <path d="M 60,140 Q 180,120 320,130 Q 480,105 630,160" fill="none" stroke="#475569" strokeWidth="1" strokeDasharray="6 3" opacity="0.6" />
-                  <path d="M 100,170 Q 230,150 380,165 Q 510,140 610,190" fill="none" stroke="#475569" strokeWidth="1" strokeDasharray="4 2" opacity="0.4" />
+                {/* Telemetry loading overlay */}
+                {loadingIncidents && mappedIncidents.length === 0 && (
+                  <div className="map-loading-overlay" role="status">
+                    <div className="loading-overlay-content">
+                      <div className="telemetry-spinner" aria-hidden="true" />
+                      <strong>Syncing Incident GIS Telemetry...</strong>
+                      <p>Querying verified hazard coordinates from the national disaster database.</p>
+                    </div>
+                  </div>
+                )}
 
-                  {/* Province Boundary Separator Guide Lines */}
-                  <line x1="160" y1="125" x2="140" y2="255" stroke="#1e293b" strokeWidth="1.5" strokeDasharray="3 3" />
-                  <line x1="280" y1="105" x2="260" y2="255" stroke="#1e293b" strokeWidth="1.5" strokeDasharray="3 3" />
-                  <line x1="420" y1="115" x2="390" y2="250" stroke="#1e293b" strokeWidth="1.5" strokeDasharray="3 3" />
-                  <line x1="530" y1="110" x2="510" y2="245" stroke="#1e293b" strokeWidth="1.5" strokeDasharray="3 3" />
-
-                  {/* Major Regional Label Anchors */}
-                  <text x="100" y="195" fill="#64748b" fontSize="11" fontFamily="sans-serif">Sudurpashchim</text>
-                  <text x="210" y="185" fill="#64748b" fontSize="11" fontFamily="sans-serif">Karnali / Lumbini</text>
-                  <text x="340" y="165" fill="#64748b" fontSize="11" fontFamily="sans-serif">Gandaki (Pokhara)</text>
-                  <text x="445" y="175" fill="#93c5fd" fontSize="11" fontWeight="600" fontFamily="sans-serif">Kathmandu Valley</text>
-                  <text x="560" y="200" fill="#64748b" fontSize="11" fontFamily="sans-serif">Koshi Province</text>
-
-                  {/* Kathmandu Valley Key Focus Radial Marker */}
-                  <g transform="translate(470, 190)">
-                    <circle cx="0" cy="0" r="14" fill="#3b82f6" opacity="0.15" />
-                    <circle cx="0" cy="0" r="7" fill="#2563eb" />
-                    <circle cx="0" cy="0" r="3" fill="#ffffff" />
-                  </g>
-                </svg>
-
-                {/* Plot real incident markers positioned by coordinates */}
-                <div className="incident-pins-overlay">
-                  {mappedIncidents.map(inc => {
-                    const pos = projectToNepalMap(inc.latitude, inc.longitude);
-                    const isSelected = selectedIncident?.id === inc.id;
-                    const sev = (inc.severity || 'Medium').toLowerCase();
-                    return (
+                {/* Telemetry error overlay with retry button */}
+                {errorIncidents && mappedIncidents.length === 0 && !loadingIncidents && (
+                  <div className="map-error-overlay" role="alert">
+                    <div className="error-overlay-content">
+                      <span className="error-icon" aria-hidden="true">⚠️</span>
+                      <strong>Incident Telemetry Offline</strong>
+                      <p>{errorIncidents}</p>
                       <button
-                        key={inc.id}
                         type="button"
-                        className={`map-incident-pin pin-${sev} ${isSelected ? 'pin-selected' : ''}`}
-                        style={{ top: `${pos.top}%`, left: `${pos.left}%` }}
-                        onClick={() => setSelectedIncident(inc)}
-                        title={`${inc.hazard} in ${formatIncidentLocation(inc)}`}
-                        aria-label={`Incident pin: ${inc.hazard} at ${inc.latitude}, ${inc.longitude}`}
+                        className="btn-map-retry"
+                        onClick={() => loadData({ silent: false })}
                       >
-                        <span className="pin-core-dot" />
-                        <span className="pin-pulse-wave" aria-hidden="true" />
-                        <span className="pin-tooltip">
-                          <strong>{inc.hazard}</strong>
-                          <small>{formatIncidentLocation(inc)} ({inc.status})</small>
-                        </span>
+                        Retry Telemetry Sync
                       </button>
-                    );
-                  })}
-                </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty overlay if filters yield zero geolocated incidents */}
+                {mappedIncidents.length === 0 && !loadingIncidents && !errorIncidents && (
+                  <div className="map-empty-overlay">
+                    <div className="empty-overlay-content">
+                      <span className="empty-icon" aria-hidden="true">📍</span>
+                      <strong>No Approved Geolocated Incidents Match Filters</strong>
+                      <p>
+                        {['Reported', 'InReview'].includes(filterStatus)
+                          ? `The selected filter status ("${filterStatus}") indicates an unverified observation. Only administrator-verified and responding incidents are displayed on the public GIS map.`
+                          : filteredIncidents.length > 0
+                            ? `${filteredIncidents.length} incident(s) match your criteria, but their precise GPS coordinates are withheld or pending field recording.`
+                            : 'No active disaster incidents match the selected hazard or province criteria.'}
+                      </p>
+                      <button
+                        type="button"
+                        className="btn-map-overlay-reset"
+                        onClick={() => {
+                          setFilterHazard('ALL');
+                          setFilterSeverity('ALL');
+                          setFilterStatus('ALL');
+                          setFilterProvince('all');
+                          setSearchQuery('');
+                        }}
+                      >
+                        Reset All Filters
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Map Footer Legend */}
               <div className="gis-legend-strip">
-                <span className="legend-head">Severity Legend:</span>
+                <span className="legend-head">Severity:</span>
                 <span className="legend-indicator dot-critical">Critical / High Threat</span>
+                <span className="legend-indicator dot-high">High Alert</span>
                 <span className="legend-indicator dot-medium">Medium Severity</span>
                 <span className="legend-indicator dot-low">Low / Monitored</span>
                 <span className="legend-indicator dot-resolved">Safely Resolved</span>
+                <span className="legend-sep" aria-hidden="true">|</span>
+                <span className="legend-head">Hazards:</span>
+                <span className="legend-item">🌊 Flood</span>
+                <span className="legend-item">⛰️ Landslide</span>
+                <span className="legend-item">🔥 Fire</span>
+                <span className="legend-item">⚡ Quake</span>
+                <span className="legend-sub font-mono">Centroid coordinates plotted · Citizen privacy protected</span>
               </div>
             </div>
 
@@ -1066,6 +1409,20 @@ export function RedesignedHomepage({
                       {selectedIncident.status}
                     </span>
                   </div>
+
+                  {/* Warning banner for pending unverified reports */}
+                  {!isApprovedForPublicDisplay(selectedIncident) && (
+                    <div className="inspector-pending-warning" role="note">
+                      <strong>⏳ Pending Administrator Verification:</strong> This observation is awaiting municipal administrator review. Ground observations are not plotted on the public GIS map until verified.
+                    </div>
+                  )}
+
+                  {/* Warning banner for reports without valid coordinates */}
+                  {!isValidNepalCoordinate(selectedIncident.latitude, selectedIncident.longitude) && (
+                    <div className="inspector-coords-notice" role="note">
+                      <strong>📍 GPS Coordinates Pending:</strong> Coordinates are withheld or unrecorded. Maintained in the community overview feed; never plotted at an estimated location.
+                    </div>
+                  )}
 
                   <div className="inspector-kv-list">
                     <div className="kv-row">
@@ -1087,6 +1444,13 @@ export function RedesignedHomepage({
                       </span>
                     </div>
 
+                    <div className="kv-row">
+                      <span className="kv-key">Priority Level:</span>
+                      <span className="kv-value font-mono">
+                        {selectedIncident.priority || 'Normal'}
+                      </span>
+                    </div>
+
                     {selectedIncident.incidentAt && (
                       <div className="kv-row">
                         <span className="kv-key">Occurred At:</span>
@@ -1099,10 +1463,19 @@ export function RedesignedHomepage({
                       <span className="kv-value font-mono">{formatNepalTime(selectedIncident.createdAt)}</span>
                     </div>
 
+                    {selectedIncident.verifiedAt && (
+                      <div className="kv-row">
+                        <span className="kv-key">Last Verified:</span>
+                        <span className="kv-value font-mono">{formatNepalTime(selectedIncident.verifiedAt)}</span>
+                      </div>
+                    )}
+
                     <div className="kv-row">
                       <span className="kv-key">Coordinates:</span>
                       <span className="kv-value font-mono">
-                        {selectedIncident.latitude != null ? `${selectedIncident.latitude.toFixed(4)}° N, ${selectedIncident.longitude.toFixed(4)}° E` : 'Locality recorded · Coordinates withheld for privacy'}
+                        {selectedIncident.latitude != null && selectedIncident.longitude != null
+                          ? `${Number(selectedIncident.latitude).toFixed(2)}° N, ${Number(selectedIncident.longitude).toFixed(2)}° E`
+                          : 'Locality recorded · Coordinates withheld for privacy'}
                       </span>
                     </div>
 
@@ -1122,6 +1495,24 @@ export function RedesignedHomepage({
                   </div>
 
                   <div className="inspector-actions">
+                    {user ? (
+                      <button
+                        type="button"
+                        className="btn-inspector-workspace"
+                        onClick={() => onGoToDashboard(user.role === 'ADMIN' ? 'admin-reports' : user.role === 'RESPONDER' ? 'responder' : 'my-reports')}
+                      >
+                        Inspect in {user.role === 'ADMIN' ? 'Admin Incident Workspace' : user.role === 'RESPONDER' ? 'Responder Operations' : 'Citizen Dashboard'} →
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn-inspector-workspace"
+                        onClick={() => onOpenAuth('login')}
+                      >
+                        Sign In for Operational Dispatch View →
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       className="btn-inspector-action"

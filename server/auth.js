@@ -15,9 +15,17 @@ export async function verifyPassword(password, stored) {
 }
 export function sessionHash(token) { return createHash('sha256').update(token).digest('hex'); }
 export function readSession(req) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice(7).trim();
+  }
+  const xToken = req.headers['x-session-token'];
+  if (xToken) return String(xToken).trim();
   const cookie = req.headers.cookie?.split(';').map(item => item.trim()).find(item => item.startsWith('session='));
   return cookie?.slice(8);
 }
 export function sessionCookie(token, expires = 604800) {
-  return `session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${expires}${process.env.COOKIE_SECURE === 'true' ? '; Secure' : ''}`;
+  const secure = process.env.COOKIE_SECURE === 'true';
+  const sameSite = secure ? 'None; Partitioned' : 'Lax';
+  return `session=${token}; HttpOnly; SameSite=${sameSite}; Path=/; Max-Age=${expires}${secure ? '; Secure' : ''}`;
 }

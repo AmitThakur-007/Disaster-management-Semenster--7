@@ -6,7 +6,11 @@ import { createApp } from './app.js';
 import { prisma } from './db.js';
 import { processNextJob } from './jobs.js';
 
-await prisma.$connect();
+try {
+  await prisma.$connect();
+} catch (err) {
+  console.warn('Database connect warning:', err.message);
+}
 const app = createApp(prisma);
 
 const port = Number(process.env.PORT) || Number(process.env.DEFAULT_APP_PORT) || 3000;
@@ -15,7 +19,7 @@ const host = process.env.HOST || '0.0.0.0';
 const isProduction = process.env.NODE_ENV === 'production';
 const distPath = path.resolve('dist');
 
-if (!isProduction && !fs.existsSync(path.join(distPath, 'index.html'))) {
+if (!isProduction) {
   const { createServer: createViteServer } = await import('vite');
   const vite = await createViteServer({
     server: { middlewareMode: true, hmr: false },

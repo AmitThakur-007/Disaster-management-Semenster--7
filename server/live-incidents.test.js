@@ -109,5 +109,40 @@ test('live incidents public API and frontend contract suite', async (t) => {
     // Homepage renders location via formatIncidentLocation
     assert.match(homepage, /formatIncidentLocation\(inc\)/);
     assert.match(homepage, /formatIncidentLocation\(selectedIncident\)/);
+
+    // GIS map enforces approved status and valid Nepal coordinates
+    assert.match(homepage, /export const APPROVED_MAP_STATUSES/);
+    assert.match(homepage, /export function isApprovedForPublicDisplay/);
+    assert.match(homepage, /export function getDisplacedCoordinates/);
+  });
+
+  await t.test('6. /api/public/map-incidents returns only approved incidents with valid coordinates', async () => {
+    const res = await get('/api/public/map-incidents');
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.data));
+    assert.ok(res.data.length > 0, 'Seeded verified reports must appear on the map');
+
+    const approvedStatuses = ['Verified', 'Dispatched', 'Responding', 'Resolved'];
+    for (const inc of res.data) {
+      assert.ok(approvedStatuses.includes(inc.status), `Incident ${inc.id} has unapproved status: ${inc.status}`);
+      assert.notEqual(inc.status, 'Reported', 'Pending Reported incidents must not be on map');
+      assert.notEqual(inc.status, 'InReview', 'Pending InReview incidents must not be on map');
+      assert.notEqual(inc.status, 'Rejected', 'Rejected incidents must not be on map');
+      assert.ok(Number.isFinite(inc.latitude), 'Latitude must be numeric');
+      assert.ok(Number.isFinite(inc.longitude), 'Longitude must be numeric');
+      assert.ok(inc.latitude >= 26.0 && inc.latitude <= 31.0, 'Latitude must be within Nepal');
+      assert.ok(inc.longitude >= 80.0 && inc.longitude <= 89.0, 'Longitude must be within Nepal');
+    }
+  });
+
+  await t.test('7. /api/public/incidents?approvedOnly=true filters to approved reports on backend', async () => {
+    const res = await get('/api/public/incidents?approvedOnly=true');
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.data));
+    const approvedStatuses = ['Verified', 'Dispatched', 'Responding', 'Resolved'];
+    for (const inc of res.data) {
+      assert.ok(approvedStatuses.includes(inc.status));
+    }
   });
 });
+

@@ -28,10 +28,17 @@ L.Icon.Default.mergeOptions({
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 async function request(url, method = 'GET', body) {
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  try {
+    const token = localStorage.getItem('cdw_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  } catch {}
+
   const res = await fetch(url, {
     method,
     credentials: 'include',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body ? JSON.stringify(body) : undefined
   });
   let data;
@@ -2912,6 +2919,7 @@ function App() {
             nav(dest || defaultDest);
           }}
           onSignOut={() => run(async () => {
+            try { localStorage.removeItem('cdw_token'); } catch {}
             await request('/api/auth/logout', 'POST', {});
             setUser(null);
             setView('home');
@@ -2974,6 +2982,7 @@ function App() {
                       className="btn-workspace-signout"
                       disabled={busy}
                       onClick={() => run(async () => {
+                        try { localStorage.removeItem('cdw_token'); } catch {}
                         await request('/api/auth/logout', 'POST', {});
                         setUser(null);
                         setView('home');
@@ -3046,6 +3055,7 @@ function App() {
               <div className="loading-state" role="status"><Spinner/><span>Loading your account...</span></div>
             ) : !user ? (
               <AuthForm busy={busy} onAuthenticated={async u => {
+                try { if (u?.token) localStorage.setItem('cdw_token', u.token); } catch {}
                 setUser(u);
                 const defaultView = u.role === 'ADMIN' ? 'admin-overview' : u.role === 'RESPONDER' ? 'responder' : 'report';
                 setView(defaultView);
@@ -3090,6 +3100,7 @@ function App() {
               initialMode={authModal.mode}
               onClose={() => setAuthModal({ open: false, mode: 'login' })}
               onAuthenticated={async u => {
+                try { if (u?.token) localStorage.setItem('cdw_token', u.token); } catch {}
                 setUser(u);
                 setAuthModal({ open: false, mode: 'login' });
                 const defaultView = u.role === 'ADMIN' ? 'admin-overview' : u.role === 'RESPONDER' ? 'responder' : 'report';
