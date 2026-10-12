@@ -1,0 +1,185 @@
+<USER_REQUEST>
+# COMMUNITY DISASTER WATCH — RESPONDER REPORT VERIFICATION
+
+Implement a **fully working disaster report verification and response workflow** in the existing Community Disaster Watch (Nepal Operational Workspace) project.
+
+Keep the implementation efficient. Use short, focused changes. Avoid unnecessary refactoring, repeated file inspections, and excessive AI usage.
+
+## 1. Inspect Before Editing
+
+- Inspect the existing project structure, database schema, APIs, authentication, dashboards, and report workflow.
+- Identify existing report statuses, roles, assignment logic, and notification systems.
+- Continue from the current code. Do not rebuild working features.
+- Reuse existing components, APIs, database models, and styles wherever possible.
+- Make a short implementation plan, then execute it without unnecessary explanations or repeated approval requests.
+
+## 2. Implement the Complete Workflow
+
+Citizen submits a report  
+↓  
+Report status: **Reported**  
+↓  
+Administrator reviews and performs initial triage  
+↓  
+Administrator assigns a responder or response team  
+↓  
+Responder investigates and submits a verification recommendation  
+↓  
+Administrator reviews the recommendation  
+↓  
+Administrator decides: **Verified**, **Rejected**, or **Needs More Information**  
+↓  
+If verified, administrator authorizes dispatch  
+↓  
+Responder acknowledges the assignment and records response progress  
+↓  
+Administrator reviews the outcome and closes the report as **Resolved**
+
+Support reopening a resolved report when justified, with a recorded reason and audit history.
+
+## 3. Responder Dashboard
+
+Build a functional **Assigned Reports / Field Verification** section.
+
+Responders must be able to:
+
+- View reports assigned to them or their authorized teams.
+- See incident type, description, location, time, submitted images, and priority.
+- View report details and incident locations on the existing map.
+- Accept or acknowledge an assignment.
+- Record field observations and investigation notes.
+- Add evidence photos when supported by the existing upload system.
+- Submit one of these recommendations:
+  - **Recommend Verified**
+  - **Recommend Rejected**
+  - **Request More Information**
+  - **Unable to Verify**
+- Explain the reason for the recommendation.
+- Record visit time, verification time, and relevant incident conditions.
+- Update response progress after dispatch.
+- View the history and current status of their assigned reports.
+
+Responders must not officially approve, reject, or close reports unless the existing authorization policy explicitly grants that permission.
+
+## 4. Administrator Controls
+
+Create or improve the administrator's report review screen.
+
+Administrators must be able to:
+
+- Review new reports and perform initial triage.
+- Assign or reassign reports to eligible responders or teams.
+- Set priority and record assignment instructions.
+- View responder observations, evidence, and recommendations.
+- Approve verification, reject the report, or request more information.
+- Require a reason for rejection and important status changes.
+- Authorize dispatch only after the report has been verified.
+- Track acknowledgement, dispatch, progress, and resolution.
+- Close reports as Resolved after reviewing the outcome.
+- Reopen reports with a mandatory reason when necessary.
+
+Show clear status badges, assignment details, timestamps, and an activity timeline.
+
+## 5. Enforce Permissions and Status Rules
+
+Implement authorization on the **backend**, not only in the UI.
+
+- Citizens can submit reports and view their own reports according to existing privacy rules.
+- Responders can access only reports assigned to them or their authorized teams.
+- Administrators can review reports within their authorized jurisdiction.
+- Superadmins retain existing system-level permissions.
+- Responders cannot approve their own verification recommendations.
+- The administrator's final decision must be separate from the responder's recommendation.
+- Prevent unauthorized status changes, duplicate assignments, and invalid transitions.
+- Validate every request on the server.
+- Keep private reports and pending reports hidden from public maps and public feeds.
+- Only reports approved for public display under existing policy may appear publicly.
+
+Use transactions or equivalent safeguards where needed to prevent conflicting status updates.
+
+## 6. Database, Evidence, and Audit History
+
+Reuse the existing database design where possible. Add only the necessary fields, tables, and migrations.
+
+Persist:
+
+- Assignment and reassignment history.
+- Responder observations and verification recommendations.
+- Evidence references and upload metadata.
+- Administrator decisions and reasons.
+- Dispatch acknowledgement and response progress.
+- Status changes, responsible user, timestamps, and resolution details.
+
+Keep an append-only audit history for important decisions. Do not silently overwrite previous recommendations or decisions.
+
+Use safe migrations. Preserve existing reports, users, assignments, and historical data.
+
+## 7. Notifications and User Experience
+
+Integrate with the existing notification system.
+
+Notify the appropriate users when:
+
+- A report is assigned or reassigned.
+- A responder acknowledges an assignment.
+- A verification recommendation is submitted.
+- An administrator requests more information or makes a decision.
+- A response is dispatched, updated, resolved, or reopened.
+
+Use existing in-app, email, or other notification channels where configured. Do not claim that a notification was sent if the delivery failed.
+
+Make all screens responsive and accessible. Include loading states, empty states, validation messages, error handling, and confirmation dialogs for important actions.
+
+## 8. Test the Entire Workflow
+
+Test the actual database and backend integration. Do not use mock-only functionality.
+
+Verify:
+
+- Citizen report submission.
+- Administrator triage and assignment.
+- Responder access restrictions and acknowledgement.
+- Evidence upload and recommendation submission.
+- Administrator approval, rejection, and information requests.
+- Dispatch authorization and response progress.
+- Resolution and reopening.
+- Audit history and notifications.
+- Unauthorized API requests and invalid status transitions.
+- Existing dashboards, authentication, maps, reports, AI analysis, weather, and organization features.
+
+Run the available tests, lint checks, and production build. Fix errors caused by your changes. Report any checks that cannot be completed.
+
+## 9. Minimize Claude and Antigravity Usage
+
+- Use the current codebase as the source of truth.
+- Inspect each relevant file once where practical.
+- Avoid broad searches, repeated summaries, unnecessary rewrites, and unrelated UI changes.
+- Reuse existing components, API patterns, and validation utilities.
+- Implement the workflow in small, connected changes.
+- Run targeted tests first, followed by the relevant full test suite and build.
+- Do not generate lengthy explanations during implementation.
+- Do not stop after writing a plan or creating a UI mockup. Complete the backend, database, permissions, frontend, and tests.
+- If context or usage limits are reached, leave a concise progress note listing completed work, changed files, remaining tasks, and test results so work can resume without repeating completed steps.
+
+## 10. Final Requirements
+
+Preserve all existing Community Disaster Watch features, branding, and role-based dashboards.
+
+Do not delete existing data, reset the database, remove working functionality, weaken security, or run destructive Git commands. Do not commit or push unless explicitly requested.
+
+At completion, provide a brief report containing:
+
+1. Features implemented.
+2. Database and API changes.
+3. Files changed.
+4. Tests and build results.
+5. Known issues or incomplete work.
+
+**Acceptance criteria:** A citizen can submit a report, an administrator can assign it, a responder can investigate and recommend a decision, the administrator can make the final verification decision, and the authorized response team can record dispatch and progress until the administrator closes the incident. Every action must be persisted, permission-checked, and auditable.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-12T16:05:22+05:45.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Claude Sonnet 4.6 (Thinking). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

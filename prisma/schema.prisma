@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+model User {
+  id           String @id @default(uuid())
+  name         String
+  firstName    String?
+  lastName     String?
+  email        String @unique
+  phone        String? @unique
+  passwordHash String
+  role         String @default("RESIDENT")
+  createdAt    DateTime @default(now())
+  // Profile address fields (all optional, backward-compatible)
+  province     String?
+  district     String?
+  municipality String?
+  ward         String?
+  locality     String?
+  addressLat   Float?
+  addressLng   Float?
+  sessions     Session[]
+  subscriptions Subscription[]
+  reports      Report[]
+  notifications Notification[]
+  assignments  AdminArea[]
+  reviews      Review[]
+  incidentEvents IncidentEvent[]
+  createdOrganizations ResponseOrganization[]
+  teamMemberships TeamMember[]
+  assignmentsMade IncidentAssignment[] @relation("AssignmentActor")
+  recommendations VerificationRecommendation[]
+}
+model Session {
+  id        String @id
+  userId    String
+  expiresAt DateTime
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([expiresAt])
+}
+model Area {
+  id            String @id
+  name          String @unique
+  latitude      Float
+  longitude     Float
+  subscriptions Subscription[]
+  reports       Report[]
+  administrators AdminArea[]
+}
+model AdminArea {
+  userId String
+  areaId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  @@id([userId, areaId])
+}
+model Subscription {
+  userId String
+  areaId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  @@id([userId, areaId])
+}
+model Report {
+  id          String @id @default(uuid())
+  hazard      String
+  description String
+  photoPath   String
+  areaId      String
+  reporterId  String
+  status      String @default("Reported")
+  severity    String @default("Medium")
+  priority    String @default("Normal")
+  province    String?
+  locality    String?
+  district    String?
+  municipality String?
+  ward        String?
+  latitude    Float?
+  longitude   Float?
+  incidentAt  DateTime?
+  verifiedAt  DateTime?
+  verifierId  String?
+  rejectionReason String?
+  resolutionSummary String?
+  assignmentInstructions String?
+  reopenReason String?
+  reopenedAt  DateTime?
+  createdAt   DateTime @default(now())
+  area        Area @relation(fields: [areaId], references: [id])
+  reporter    User @relation(fields: [reporterId], references: [id])
+  job         AnalysisJob?
+  notifications Notification[]
+  reviews     Review[]
+  events      IncidentEvent[]
+  incidentAssignments IncidentAssignment[]
+  recommendations VerificationRecommendation[]
+  @@index([areaId, createdAt])
+  @@index([status, severity, createdAt])
+}
+model Review {
+  id        String @id @default(uuid())
+  reportId  String
+  reviewerId String
+  status    String
+  createdAt DateTime @default(now())
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reviewer User @relation(fields: [reviewerId], references: [id])
+}
+model Notification {
+  id        String @id @default(uuid())
+  userId    String
+  reportId  String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+}
+model AnalysisJob {
+  id          String @id @default(uuid())
+  reportId    String @unique
+  status      String @default("Pending")
+  attempts    Int @default(0)
+  availableAt DateTime @default(now())
+  lockedAt    DateTime?
+  error       String?
+  result      Json?
+  weather     Json?
+  model       String?
+  completedAt DateTime?
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  @@index([status, availableAt])
+}
+
+model ResponseOrganization {
+  id String @id @default(uuid())
+  name String @unique
+  type String
+  jurisdiction String?
+  active Boolean @default(true)
+  createdById String
+  createdAt DateTime @default(now())
+  createdBy User @relation(fields: [createdById], references: [id])
+  teams ResponseTeam[]
+}
+model ResponseTeam {
+  id String @id @default(uuid())
+  organizationId String
+  name String
+  active Boolean @default(true)
+  organization ResponseOrganization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  members TeamMember[]
+  assignments IncidentAssignment[]
+  @@unique([organizationId, name])
+}
+model TeamMember {
+  teamId String
+  userId String
+  team ResponseTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([teamId, userId])
+}
+model IncidentAssignment {
+  id String @id @default(uuid())
+  reportId String
+  teamId String
+  assignedById String
+  assignedAt DateTime @default(now())
+  acknowledgedAt DateTime?
+  progressNote String?
+  respondedAt DateTime?
+  dispatchedAt DateTime?
+  active Boolean @default(true)
+  report Report @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  team ResponseTeam @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  assignedBy User @relation("AssignmentActor", fields: [assignedById], references: [id])
+  @@unique([reportId, teamId])
+  @@index([teamId, active])
+}
+model IncidentEvent {
+  id String @id @default(uuid())
+  reportId String
+  actorId String
+  type String
+  previousStatus String?
+  newStatus String?
+  note String?
+  createdAt DateTime @default(now())
+  report Report @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  actor User @relation(fields: [actorId], references: [id])
+  @@index([reportId, createdAt])
+}
+model VerificationRecommendation {
+  id String @id @default(uuid())
+  reportId String
+  responderId String
+  recommendation String
+  reason String
+  observations String?
+  visitedAt DateTime?
+  createdAt DateTime @default(now())
+  report Report @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  responder User @relation(fields: [responderId], references: [id])
+  @@index([reportId, createdAt])
+}

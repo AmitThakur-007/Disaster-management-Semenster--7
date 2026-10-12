@@ -1,0 +1,7 @@
+{
+  "name": "Community Disaster Watch — Nepal",
+  "description": "Centralized disaster reporting, real-time monitoring, and emergency coordination platform for Nepal.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

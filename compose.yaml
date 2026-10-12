@@ -1,0 +1,79 @@
+# PostgreSQL + migrations/seed + app. Data persists in Docker volumes.
+x-db-url: &db-url postgresql://disaster:${POSTGRES_PASSWORD:-disaster_dev_pass}@db:5432/disaster_watch
+
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: disaster
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-disaster_dev_pass}
+      POSTGRES_DB: disaster_watch
+    ports:
+      - "127.0.0.1:${DB_PORT:-15432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U disaster -d disaster_watch"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  migrate:
+    build: .
+    environment:
+      DATABASE_URL: *db-url
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@disasterwatch.np}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Administrator123!}
+    command: ["sh", "-c", "npx prisma migrate deploy && node prisma/seed.js"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: *db-url
+      PORT: "3000"
+      HOST: 0.0.0.0
+      APP_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      UPLOAD_DIR: /app/data/uploads
+      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:latest}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads:/app/data/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@disasterwatch.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin12345}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-disaster_dev_pass}
+    # Writes a pgpass file so the server connects without asking for the password.
+    entrypoint: ["/bin/sh", "-c", "echo \"db:5432:disaster_watch:disaster:$$POSTGRES_PASSWORD\" > /tmp/pgpass && chmod 600 /tmp/pgpass && exec /entrypoint.sh"]
+    ports:
+      - "127.0.0.1:5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  uploads:
+  pgadmin_data:
