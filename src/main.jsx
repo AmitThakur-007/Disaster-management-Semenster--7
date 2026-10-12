@@ -122,7 +122,8 @@ function NepalLocationSelector({
   onWardOtherChange,
   onDistrictCenterSelected,
   disabled = false,
-  required = false
+  required = false,
+  idPrefix = 'loc'
 }) {
   const availableDistricts = province ? getDistrictsForProvince(province) : ALL_DISTRICTS.map(d => d.name);
   const availableMunicipalities = district ? getMunicipalitiesForDistrict(district) : [];
@@ -174,108 +175,122 @@ function NepalLocationSelector({
       <div className="location-steps-grid">
         {/* Step 1: Province */}
         <div className="location-step-field">
-          <label className="location-step-label">
-            <span className="step-badge">1</span> Province {required && <span className="required">*</span>}
-            <select
-              className="location-select"
-              value={province || ''}
-              onChange={handleProvinceSelect}
-              disabled={disabled}
-              required={required}
-              aria-label="Select Province"
-            >
-              <option value="">— Select Province (7 Provinces) —</option>
-              {PROVINCES.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
+          <label htmlFor={`${idPrefix}-province`} className="location-step-label">
+            <span className="step-badge" aria-hidden="true">1</span>
+            <span>Province {required && <span className="required" aria-hidden="true">*</span>}</span>
           </label>
+          <select
+            id={`${idPrefix}-province`}
+            className="location-select"
+            value={province || ''}
+            onChange={handleProvinceSelect}
+            disabled={disabled}
+            required={required}
+            aria-required={required ? 'true' : undefined}
+            aria-label="Select Province"
+          >
+            <option value="">— Select Province (7 Provinces) —</option>
+            {PROVINCES.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
         </div>
 
         {/* Step 2: District */}
         <div className="location-step-field">
-          <label className="location-step-label">
-            <span className="step-badge">2</span> District {required && <span className="required">*</span>}
-            <select
-              className="location-select"
-              value={district || ''}
-              onChange={handleDistrictSelect}
-              disabled={disabled}
-              required={required}
-              aria-label="Select District"
-            >
-              <option value="">
-                {!province ? '— Select District (All 77 Districts) —' : `— Select District (${availableDistricts.length} in ${province}) —`}
-              </option>
-              {availableDistricts.map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+          <label htmlFor={`${idPrefix}-district`} className="location-step-label">
+            <span className="step-badge" aria-hidden="true">2</span>
+            <span>District {required && <span className="required" aria-hidden="true">*</span>}</span>
           </label>
+          <select
+            id={`${idPrefix}-district`}
+            className="location-select"
+            value={district || ''}
+            onChange={handleDistrictSelect}
+            disabled={disabled}
+            required={required}
+            aria-required={required ? 'true' : undefined}
+            aria-label="Select District"
+          >
+            <option value="">
+              {!province ? '— Select District (All 77 Districts) —' : `— Select District (${availableDistricts.length} in ${province}) —`}
+            </option>
+            {availableDistricts.map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
         </div>
 
         {/* Step 3: Municipality */}
         <div className="location-step-field">
-          <label className="location-step-label">
-            <span className="step-badge">3</span> Municipality / Local Body {required && <span className="required">*</span>}
-            <select
-              className="location-select"
-              value={municipality || ''}
-              onChange={handleMunicipalitySelect}
-              disabled={disabled || !district}
-              required={required}
-              aria-label="Select Municipality or Rural Municipality"
-            >
-              <option value="">
-                {!district ? '— First select a district —' : `— Select Municipality (${availableMunicipalities.length} local levels) —`}
-              </option>
-              {availableMunicipalities.map(m => (
-                <option key={m.name} value={m.name}>{m.name}</option>
-              ))}
-              <option value="Other">⊕ Other / Not listed</option>
-            </select>
+          <label htmlFor={`${idPrefix}-municipality`} className="location-step-label">
+            <span className="step-badge" aria-hidden="true">3</span>
+            <span>Municipality / Local Body {required && <span className="required" aria-hidden="true">*</span>}</span>
           </label>
+          <select
+            id={`${idPrefix}-municipality`}
+            className="location-select"
+            value={municipality || ''}
+            onChange={handleMunicipalitySelect}
+            disabled={disabled || !district}
+            required={required}
+            aria-required={required ? 'true' : undefined}
+            aria-label="Select Municipality or Rural Municipality"
+          >
+            <option value="">
+              {!district ? '— First select a district —' : `— Select Municipality (${availableMunicipalities.length} local levels) —`}
+            </option>
+            {availableMunicipalities.map(m => (
+              <option key={m.name} value={m.name}>{m.name}</option>
+            ))}
+            <option value="Other">⊕ Other / Not listed</option>
+          </select>
         </div>
 
         {/* Step 4: Ward */}
         <div className="location-step-field">
-          <label className="location-step-label">
-            <span className="step-badge">4</span> Ward / Area
-            <select
-              className="location-select"
-              value={ward || ''}
-              onChange={handleWardSelect}
-              disabled={disabled || !municipality || municipality === 'Other'}
-              aria-label="Select Ward"
-            >
-              <option value="">
-                {!municipality ? '— First select municipality —' : municipality === 'Other' ? '— Specify locality below —' : '— Select Ward —'}
-              </option>
-              {availableWards.map(w => (
-                <option key={w} value={w}>{w}</option>
-              ))}
-              <option value="Other">⊕ Other / Ward not listed</option>
-            </select>
+          <label htmlFor={`${idPrefix}-ward`} className="location-step-label">
+            <span className="step-badge" aria-hidden="true">4</span>
+            <span>Ward / Area {required && <span className="required" aria-hidden="true">*</span>}</span>
           </label>
+          <select
+            id={`${idPrefix}-ward`}
+            className="location-select"
+            value={ward || ''}
+            onChange={handleWardSelect}
+            disabled={disabled || !municipality || municipality === 'Other'}
+            required={required}
+            aria-required={required ? 'true' : undefined}
+            aria-label="Select Ward"
+          >
+            <option value="">
+              {!municipality ? '— First select municipality —' : municipality === 'Other' ? '— Specify locality below —' : '— Select Ward —'}
+            </option>
+            {availableWards.map(w => (
+              <option key={w} value={w}>{w}</option>
+            ))}
+            <option value="Other">⊕ Other / Ward not listed</option>
+          </select>
         </div>
       </div>
 
       {/* Other / Specific Locality Name Input */}
       {showOtherField && (
         <div className="location-other-container">
-          <label className="location-other-label">
-            Specific locality / neighborhood / village name <span className="required">*</span>
-            <input
-              type="text"
-              className="location-other-input"
-              value={wardOther || ''}
-              onChange={e => onWardOtherChange && onWardOtherChange(e.target.value)}
-              placeholder="e.g. Tole name, chowk, landmark, or village area"
-              maxLength={120}
-              disabled={disabled}
-              required={required}
-            />
+          <label htmlFor={`${idPrefix}-ward-other`} className="location-other-label">
+            <span>Specific locality / neighborhood / village name <span className="required" aria-hidden="true">*</span></span>
           </label>
+          <input
+            id={`${idPrefix}-ward-other`}
+            type="text"
+            className="location-other-input"
+            value={wardOther || ''}
+            onChange={e => onWardOtherChange && onWardOtherChange(e.target.value)}
+            placeholder="e.g. Tole name, chowk, landmark, or village area"
+            maxLength={120}
+            disabled={disabled}
+            required={required}
+          />
           <small className="hint">For rural settlements, unlisted wards, or specific local landmarks.</small>
         </div>
       )}
@@ -528,9 +543,55 @@ function ViewLocationLink({ lat, lng, address }) {
   return <span className="hint">No location recorded</span>;
 }
 
+// ── Auth Form Icons ───────────────────────────────────────────────────────────
+function EyeIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  );
+}
+
+function AlertCircleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
 // ── Auth Form ─────────────────────────────────────────────────────────────────
-// ── Auth Form ─────────────────────────────────────────────────────────────────
-function AuthForm({ onAuthenticated, busy, initialMode = 'login', onClose }) {
+function AuthForm({ onAuthenticated, busy, initialMode = 'login', onModeChange, onClose }) {
   const [register, setRegister] = useState(initialMode === 'register');
   // Login fields
   const [loginEmail, setLoginEmail] = useState('');
@@ -656,7 +717,11 @@ function AuthForm({ onAuthenticated, busy, initialMode = 'login', onClose }) {
   }
 
   function toggleMode() {
-    setRegister(r => !r);
+    setRegister(r => {
+      const next = !r;
+      if (onModeChange) onModeChange(next ? 'register' : 'login');
+      return next;
+    });
     setFormError('');
     setFieldErrors({});
     setConflict({ email: false, phone: false });
@@ -675,274 +740,409 @@ function AuthForm({ onAuthenticated, busy, initialMode = 'login', onClose }) {
 
   return (
     <section className={`auth-panel panel ${register ? 'auth-panel-register' : 'auth-panel-login'}`}>
-      <div className="auth-header">
-        <div className="auth-brand-badge" aria-hidden="true">
-          <span className="brand-mark-lg">CDW</span>
-        </div>
-        <p className="eyebrow">COMMUNITY DISASTER WATCH</p>
-        <h2 id="auth-heading">{register ? 'Create your account' : 'Sign in to your account'}</h2>
-        <p className="hint auth-description">
-          {register
-            ? 'New accounts have citizen access. Privileged roles are assigned by an administrator.'
-            : 'Sign in to submit incident reports and receive community notifications.'}
-        </p>
-      </div>
+      {register ? (
+        <div className="auth-register-horizontal-wrapper">
+          {/* Left section — Account introduction */}
+          <aside className="auth-register-intro" aria-label="Account introduction">
+            <div className="auth-intro-brand">
+              <div className="auth-brand-badge" aria-hidden="true">
+                <span className="brand-crest">🏛️</span>
+                <span className="brand-mark-lg">CDW NEPAL</span>
+              </div>
+              <p className="auth-intro-eyebrow">COMMUNITY DISASTER WATCH</p>
+            </div>
 
-      {formError && (
-        <div className="auth-alert auth-alert-error" role="alert">
-          <span className="alert-icon" aria-hidden="true">⚠️</span>
-          <div className="alert-text">
-            {(conflict.email && register) ? (
-              <div className="auth-conflict">
-                <span>{formError}</span>
-                <button
-                  type="button"
-                  className="auth-switch-btn"
-                  onClick={() => { setRegister(false); setFormError(''); setFieldErrors({}); setConflict({ email: false, phone: false }); }}
-                >
-                  Sign in with this email instead →
-                </button>
+            <div className="auth-intro-main">
+              <h2 id="auth-heading" className="auth-intro-title">Create Your Account</h2>
+              <p className="auth-intro-lead">
+                Join Community Disaster Watch to report incidents and support disaster response in Nepal.
+              </p>
+
+              <div className="auth-intro-visual" aria-hidden="true">
+                <img
+                  src="/src/assets/images/community_preparedness_nepal_1791542080937.jpg"
+                  alt="Community emergency preparedness and disaster monitoring in Nepal"
+                  className="auth-intro-image"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="auth-intro-image-overlay">
+                  <span className="auth-image-caption-badge">EMERGENCY OPERATIONS</span>
+                  <span className="auth-image-caption-text">National Emergency Operations & Citizen Watch</span>
+                </div>
               </div>
-            ) : (conflict.phone && register) ? (
-              <div className="auth-conflict">
-                <span>{formError}</span>
-                <button
-                  type="button"
-                  className="auth-switch-btn"
-                  onClick={() => { setRegister(false); setFormError(''); setFieldErrors({}); setConflict({ email: false, phone: false }); }}
-                >
-                  Sign in with this account instead →
-                </button>
+
+              <ul className="auth-intro-pillars" aria-label="Key operational capabilities">
+                <li>
+                  <span className="pillar-bullet" aria-hidden="true">
+                    <CheckIcon />
+                  </span>
+                  <div>
+                    <strong>Verified Disaster Reporting</strong>
+                    <p>Citizen hazard observations routed directly to ward response teams</p>
+                  </div>
+                </li>
+                <li>
+                  <span className="pillar-bullet" aria-hidden="true">
+                    <CheckIcon />
+                  </span>
+                  <div>
+                    <strong>Ward-Level Geo-Coordination</strong>
+                    <p>Active across 7 Provinces, 77 Districts, and local municipal wards</p>
+                  </div>
+                </li>
+                <li>
+                  <span className="pillar-bullet" aria-hidden="true">
+                    <CheckIcon />
+                  </span>
+                  <div>
+                    <strong>Rapid Multi-Agency Dispatch</strong>
+                    <p>Direct liaison with DEOC units, Red Cross, and local emergency crews</p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <div className="auth-intro-notice">
+              <span className="notice-icon" aria-hidden="true">
+                <InfoIcon />
+              </span>
+              <span>Resident accounts have citizen reporting access. Privileged administration and responder access are assigned by regional coordinators.</span>
+            </div>
+          </aside>
+
+          {/* Right section — Registration form */}
+          <div className="auth-register-form-area">
+            <div className="auth-form-top">
+              <div className="auth-form-kicker">CITIZEN ACCESS PORTAL</div>
+              <h3 className="auth-form-title">Resident Account Registration</h3>
+              <p className="auth-form-subtitle">Enter your official personal details, administrative location, and contact credentials.</p>
+            </div>
+
+            {formError && (
+              <div className="auth-alert auth-alert-error" role="alert">
+                <span className="alert-icon" aria-hidden="true">
+                  <AlertCircleIcon />
+                </span>
+                <div className="alert-text">
+                  {(conflict.email && register) ? (
+                    <div className="auth-conflict">
+                      <span>{formError}</span>
+                      <button
+                        type="button"
+                        className="auth-switch-btn"
+                        onClick={() => { setRegister(false); if (onModeChange) onModeChange('login'); setFormError(''); setFieldErrors({}); setConflict({ email: false, phone: false }); }}
+                      >
+                        Sign in with this email instead →
+                      </button>
+                    </div>
+                  ) : (conflict.phone && register) ? (
+                    <div className="auth-conflict">
+                      <span>{formError}</span>
+                      <button
+                        type="button"
+                        className="auth-switch-btn"
+                        onClick={() => { setRegister(false); if (onModeChange) onModeChange('login'); setFormError(''); setFieldErrors({}); setConflict({ email: false, phone: false }); }}
+                      >
+                        Sign in with this account instead →
+                      </button>
+                    </div>
+                  ) : (
+                    formError
+                  )}
+                </div>
               </div>
-            ) : (
-              formError
             )}
+
+            <form onSubmit={handleSubmit} noValidate aria-labelledby="auth-heading" className="auth-form-body">
+              {/* Row 1: Personal details (First name | Surname) */}
+              <div className="auth-form-fieldset">
+                <div className="fieldset-header">
+                  <h4 className="fieldset-title">
+                    <span className="fieldset-step" aria-hidden="true">1</span> Personal Details
+                  </h4>
+                  <span className="required-indicator-note" aria-hidden="true">
+                    <span className="required">*</span> Required
+                  </span>
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-field-group">
+                    <label htmlFor="reg-firstName" className="form-field-label">
+                      <span>First name <span className="required" aria-hidden="true">*</span></span>
+                    </label>
+                    <input
+                      id="reg-firstName"
+                      name="firstName"
+                      type="text"
+                      value={firstName}
+                      onChange={e => { setFirstName(e.target.value); setFieldErrors(p => ({...p, firstName: ''})); }}
+                      required
+                      maxLength={80}
+                      autoComplete="given-name"
+                      placeholder="e.g. Ramesh"
+                      disabled={isWorking}
+                      aria-required="true"
+                      aria-describedby={fieldErrors.firstName ? 'err-firstName' : undefined}
+                      aria-invalid={!!fieldErrors.firstName}
+                      className={`form-input ${fieldErrors.firstName ? 'input-error' : ''}`}
+                    />
+                    <FieldError id="err-firstName" name="firstName" />
+                  </div>
+
+                  <div className="form-field-group">
+                    <label htmlFor="reg-lastName" className="form-field-label">
+                      <span>Surname / Last name <span className="required" aria-hidden="true">*</span></span>
+                    </label>
+                    <input
+                      id="reg-lastName"
+                      name="lastName"
+                      type="text"
+                      value={lastName}
+                      onChange={e => { setLastName(e.target.value); setFieldErrors(p => ({...p, lastName: ''})); }}
+                      required
+                      maxLength={80}
+                      autoComplete="family-name"
+                      placeholder="e.g. Sharma"
+                      disabled={isWorking}
+                      aria-required="true"
+                      aria-describedby={fieldErrors.lastName ? 'err-lastName' : undefined}
+                      aria-invalid={!!fieldErrors.lastName}
+                      className={`form-input ${fieldErrors.lastName ? 'input-error' : ''}`}
+                    />
+                    <FieldError id="err-lastName" name="lastName" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Nepal Address (Province | District, Municipality | Ward) */}
+              <div className="auth-form-fieldset">
+                <div className="fieldset-header">
+                  <h4 className="fieldset-title">
+                    <span className="fieldset-step" aria-hidden="true">2</span> Residential Address (Nepal)
+                  </h4>
+                </div>
+                <p className="auth-fieldset-hint">Select your province, district, municipality, and ward to route emergency alerts accurately.</p>
+
+                <NepalLocationSelector
+                  idPrefix="reg-loc"
+                  province={regProvince}
+                  district={regDistrict}
+                  municipality={regMunicipality}
+                  ward={regWard}
+                  wardOther={regWardOther}
+                  onProvinceChange={v => { setRegProvince(v); setFieldErrors(p => ({...p, province: '', district: '', ward: ''})); }}
+                  onDistrictChange={v => { setRegDistrict(v); setFieldErrors(p => ({...p, district: '', ward: ''})); }}
+                  onMunicipalityChange={setRegMunicipality}
+                  onWardChange={v => { setRegWard(v); setFieldErrors(p => ({...p, ward: ''})); }}
+                  onWardOtherChange={v => { setRegWardOther(v); setFieldErrors(p => ({...p, ward: ''})); }}
+                  required={true}
+                  disabled={isWorking}
+                />
+                <FieldError id="err-province" name="province" />
+                <FieldError id="err-district" name="district" />
+                <FieldError id="err-ward" name="ward" />
+              </div>
+
+              {/* Row 3: Contact information (Phone number | Email address) */}
+              <div className="auth-form-fieldset">
+                <div className="fieldset-header">
+                  <h4 className="fieldset-title">
+                    <span className="fieldset-step" aria-hidden="true">3</span> Contact Information
+                  </h4>
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-field-group">
+                    <label htmlFor="reg-phone" className="form-field-label">
+                      <span>Phone number <span className="required" aria-hidden="true">*</span></span>
+                    </label>
+                    <input
+                      id="reg-phone"
+                      name="phone"
+                      type="tel"
+                      value={phone}
+                      onChange={e => { setPhone(e.target.value); setFieldErrors(p => ({...p, phone: ''})); setConflict(c => ({...c, phone: false})); }}
+                      required
+                      maxLength={20}
+                      autoComplete="tel"
+                      placeholder="e.g. 9841234567 or +977..."
+                      disabled={isWorking}
+                      aria-required="true"
+                      aria-describedby={fieldErrors.phone ? 'err-phone' : 'hint-phone'}
+                      aria-invalid={!!fieldErrors.phone}
+                      className={`form-input ${fieldErrors.phone ? 'input-error' : ''}`}
+                    />
+                    <FieldError id="err-phone" name="phone" />
+                    <span id="hint-phone" className="field-hint">Nepali mobile (10 digits) or international (+977...)</span>
+                  </div>
+
+                  <div className="form-field-group">
+                    <label htmlFor="reg-email" className="form-field-label">
+                      <span>Email address <span className="required" aria-hidden="true">*</span></span>
+                    </label>
+                    <input
+                      id="reg-email"
+                      name="email"
+                      type="email"
+                      value={regEmail}
+                      onChange={e => { setRegEmail(e.target.value); setFieldErrors(p => ({...p, email: ''})); setConflict(c => ({...c, email: false})); }}
+                      required
+                      maxLength={254}
+                      autoComplete="email"
+                      placeholder="your@email.com"
+                      disabled={isWorking}
+                      aria-required="true"
+                      aria-describedby={fieldErrors.email ? 'err-email' : undefined}
+                      aria-invalid={!!fieldErrors.email}
+                      className={`form-input ${fieldErrors.email ? 'input-error' : ''}`}
+                    />
+                    <FieldError id="err-email" name="email" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 4: Account security (Password | Confirm password) */}
+              <div className="auth-form-fieldset">
+                <div className="fieldset-header">
+                  <h4 className="fieldset-title">
+                    <span className="fieldset-step" aria-hidden="true">4</span> Account Security
+                  </h4>
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-field-group">
+                    <label htmlFor="reg-password" className="form-field-label">
+                      <span>Password <span className="required" aria-hidden="true">*</span></span>
+                    </label>
+                    <div className="password-input-wrapper">
+                      <input
+                        id="reg-password"
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={e => { setPassword(e.target.value); setFieldErrors(p => ({...p, password: '', confirmPassword: ''})); }}
+                        required
+                        minLength={12}
+                        maxLength={128}
+                        autoComplete="new-password"
+                        placeholder="At least 12 characters"
+                        disabled={isWorking}
+                        aria-required="true"
+                        aria-describedby={fieldErrors.password ? 'err-password' : 'hint-password'}
+                        aria-invalid={!!fieldErrors.password}
+                        className={`form-input ${fieldErrors.password ? 'input-error' : ''}`}
+                      />
+                      <button
+                        type="button"
+                        className="btn-toggle-password"
+                        onClick={() => setShowPassword(s => !s)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                      </button>
+                    </div>
+                    <FieldError id="err-password" name="password" />
+                    <span id="hint-password" className="field-hint">Must be 12 to 128 characters.</span>
+                  </div>
+
+                  <div className="form-field-group">
+                    <label htmlFor="reg-confirmPassword" className="form-field-label">
+                      <span>Confirm password <span className="required" aria-hidden="true">*</span></span>
+                    </label>
+                    <div className="password-input-wrapper">
+                      <input
+                        id="reg-confirmPassword"
+                        name="confirmPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={e => { setConfirmPassword(e.target.value); setFieldErrors(p => ({...p, confirmPassword: ''})); }}
+                        required
+                        maxLength={128}
+                        autoComplete="new-password"
+                        placeholder="Repeat your password"
+                        disabled={isWorking}
+                        aria-required="true"
+                        aria-describedby={fieldErrors.confirmPassword ? 'err-confirmPassword' : undefined}
+                        aria-invalid={!!fieldErrors.confirmPassword}
+                        className={`form-input ${fieldErrors.confirmPassword ? 'input-error' : ''}`}
+                      />
+                      <button
+                        type="button"
+                        className="btn-toggle-password"
+                        onClick={() => setShowConfirmPassword(s => !s)}
+                        aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                        title={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                      >
+                        {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
+                      </button>
+                    </div>
+                    <FieldError id="err-confirmPassword" name="confirmPassword" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="auth-form-actions">
+                <button
+                  className="primary btn-submit-auth"
+                  disabled={isWorking}
+                  type="submit"
+                  id="btn-auth-submit"
+                >
+                  {isWorking ? (
+                    <span className="btn-loading-content">
+                      <Spinner />
+                      <span>Creating account...</span>
+                    </span>
+                  ) : (
+                    'Create Account'
+                  )}
+                </button>
+
+                <div className="auth-footer-toggle">
+                  <span>
+                    Already have an account?{' '}
+                    <button
+                      className="auth-link-button"
+                      type="button"
+                      disabled={isWorking}
+                      onClick={toggleMode}
+                    >
+                      Sign in
+                    </button>
+                  </span>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
-      )}
-
-      <form onSubmit={handleSubmit} noValidate aria-labelledby="auth-heading">
-        {register ? (
-          <>
-            {/* Section 1 — Personal details */}
-            <div className="auth-section">
-              <div className="auth-section-header">
-                <h3 className="auth-section-title">
-                  <span className="section-icon" aria-hidden="true">👤</span> Personal details
-                </h3>
-                <span className="required-indicator-note" aria-hidden="true">
-                  <span className="required">*</span> Required fields
-                </span>
-              </div>
-
-              <div className="form-grid-2">
-                <div className="form-field-group">
-                  <label htmlFor="reg-firstName" className="form-field-label">
-                    <span>First name <span className="required" aria-hidden="true">*</span></span>
-                  </label>
-                  <input
-                    id="reg-firstName"
-                    name="firstName"
-                    type="text"
-                    value={firstName}
-                    onChange={e => { setFirstName(e.target.value); setFieldErrors(p => ({...p, firstName: ''})); }}
-                    required
-                    maxLength={80}
-                    autoComplete="given-name"
-                    placeholder="e.g. Ramesh"
-                    disabled={isWorking}
-                    aria-required="true"
-                    aria-describedby={fieldErrors.firstName ? 'err-firstName' : undefined}
-                    aria-invalid={!!fieldErrors.firstName}
-                    className={`form-input ${fieldErrors.firstName ? 'input-error' : ''}`}
-                  />
-                  <FieldError id="err-firstName" name="firstName" />
-                </div>
-
-                <div className="form-field-group">
-                  <label htmlFor="reg-lastName" className="form-field-label">
-                    <span>Surname / Last name <span className="required" aria-hidden="true">*</span></span>
-                  </label>
-                  <input
-                    id="reg-lastName"
-                    name="lastName"
-                    type="text"
-                    value={lastName}
-                    onChange={e => { setLastName(e.target.value); setFieldErrors(p => ({...p, lastName: ''})); }}
-                    required
-                    maxLength={80}
-                    autoComplete="family-name"
-                    placeholder="e.g. Sharma"
-                    disabled={isWorking}
-                    aria-required="true"
-                    aria-describedby={fieldErrors.lastName ? 'err-lastName' : undefined}
-                    aria-invalid={!!fieldErrors.lastName}
-                    className={`form-input ${fieldErrors.lastName ? 'input-error' : ''}`}
-                  />
-                  <FieldError id="err-lastName" name="lastName" />
-                </div>
-              </div>
-
-              <div className="form-grid-2">
-                <div className="form-field-group">
-                  <label htmlFor="reg-phone" className="form-field-label">
-                    <span>Phone number <span className="required" aria-hidden="true">*</span></span>
-                  </label>
-                  <input
-                    id="reg-phone"
-                    name="phone"
-                    type="tel"
-                    value={phone}
-                    onChange={e => { setPhone(e.target.value); setFieldErrors(p => ({...p, phone: ''})); setConflict(c => ({...c, phone: false})); }}
-                    required
-                    maxLength={20}
-                    autoComplete="tel"
-                    placeholder="e.g. 9841234567 or +9779841234567"
-                    disabled={isWorking}
-                    aria-required="true"
-                    aria-describedby={fieldErrors.phone ? 'err-phone' : 'hint-phone'}
-                    aria-invalid={!!fieldErrors.phone}
-                    className={`form-input ${fieldErrors.phone ? 'input-error' : ''}`}
-                  />
-                  <FieldError id="err-phone" name="phone" />
-                  <span id="hint-phone" className="field-hint">Nepali mobile (10 digits) or international (+977...)</span>
-                </div>
-
-                <div className="form-field-group">
-                  <label htmlFor="reg-email" className="form-field-label">
-                    <span>Email address <span className="required" aria-hidden="true">*</span></span>
-                  </label>
-                  <input
-                    id="reg-email"
-                    name="email"
-                    type="email"
-                    value={regEmail}
-                    onChange={e => { setRegEmail(e.target.value); setFieldErrors(p => ({...p, email: ''})); setConflict(c => ({...c, email: false})); }}
-                    required
-                    maxLength={254}
-                    autoComplete="email"
-                    placeholder="your@email.com"
-                    disabled={isWorking}
-                    aria-required="true"
-                    aria-describedby={fieldErrors.email ? 'err-email' : undefined}
-                    aria-invalid={!!fieldErrors.email}
-                    className={`form-input ${fieldErrors.email ? 'input-error' : ''}`}
-                  />
-                  <FieldError id="err-email" name="email" />
-                </div>
-              </div>
+      ) : (
+        /* Sign In Mode */
+        <div className="auth-login-wrapper">
+          <div className="auth-header">
+            <div className="auth-brand-badge" aria-hidden="true">
+              <span className="brand-crest">🏛️</span>
+              <span className="brand-mark-lg">CDW NEPAL</span>
             </div>
+            <p className="eyebrow">COMMUNITY DISASTER WATCH</p>
+            <h2 id="auth-heading">Sign in to your account</h2>
+            <p className="hint auth-description">
+              Sign in to submit incident reports and receive community notifications.
+            </p>
+          </div>
 
-            {/* Address section (Residential address in Nepal) */}
-            <div className="auth-section">
-              <div className="auth-section-header">
-                <h3 className="auth-section-title">
-                  <span className="section-icon" aria-hidden="true">📍</span> Residential address (Nepal)
-                </h3>
-              </div>
-              <p className="hint auth-section-hint">Select your province, district, and ward to help route emergency alerts accurately.</p>
-              <NepalLocationSelector
-                province={regProvince}
-                district={regDistrict}
-                municipality={regMunicipality}
-                ward={regWard}
-                wardOther={regWardOther}
-                onProvinceChange={v => { setRegProvince(v); setFieldErrors(p => ({...p, province: '', district: '', ward: ''})); }}
-                onDistrictChange={v => { setRegDistrict(v); setFieldErrors(p => ({...p, district: '', ward: ''})); }}
-                onMunicipalityChange={setRegMunicipality}
-                onWardChange={v => { setRegWard(v); setFieldErrors(p => ({...p, ward: ''})); }}
-                onWardOtherChange={v => { setRegWardOther(v); setFieldErrors(p => ({...p, ward: ''})); }}
-                required={true}
-                disabled={isWorking}
-              />
-              <FieldError id="err-province" name="province" />
-              <FieldError id="err-district" name="district" />
-              <FieldError id="err-ward" name="ward" />
+          {formError && (
+            <div className="auth-alert auth-alert-error" role="alert">
+              <span className="alert-icon" aria-hidden="true">
+                <AlertCircleIcon />
+              </span>
+              <div className="alert-text">{formError}</div>
             </div>
+          )}
 
-            {/* Section 2 — Account security */}
-            <div className="auth-section">
-              <div className="auth-section-header">
-                <h3 className="auth-section-title">
-                  <span className="section-icon" aria-hidden="true">🔒</span> Account security
-                </h3>
-              </div>
-
-              <div className="form-grid-2">
-                <div className="form-field-group">
-                  <label htmlFor="reg-password" className="form-field-label">
-                    <span>Password <span className="required" aria-hidden="true">*</span></span>
-                  </label>
-                  <div className="password-input-wrapper">
-                    <input
-                      id="reg-password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={e => { setPassword(e.target.value); setFieldErrors(p => ({...p, password: '', confirmPassword: ''})); }}
-                      required
-                      minLength={12}
-                      maxLength={128}
-                      autoComplete="new-password"
-                      placeholder="At least 12 characters"
-                      disabled={isWorking}
-                      aria-required="true"
-                      aria-describedby={fieldErrors.password ? 'err-password' : 'hint-password'}
-                      aria-invalid={!!fieldErrors.password}
-                      className={`form-input ${fieldErrors.password ? 'input-error' : ''}`}
-                    />
-                    <button
-                      type="button"
-                      className="btn-toggle-password"
-                      onClick={() => setShowPassword(s => !s)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      title={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? '🙈' : '👁️'}
-                    </button>
-                  </div>
-                  <FieldError id="err-password" name="password" />
-                  <span id="hint-password" className="field-hint">Must be 12 to 128 characters.</span>
-                </div>
-
-                <div className="form-field-group">
-                  <label htmlFor="reg-confirmPassword" className="form-field-label">
-                    <span>Confirm password <span className="required" aria-hidden="true">*</span></span>
-                  </label>
-                  <div className="password-input-wrapper">
-                    <input
-                      id="reg-confirmPassword"
-                      name="confirmPassword"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={confirmPassword}
-                      onChange={e => { setConfirmPassword(e.target.value); setFieldErrors(p => ({...p, confirmPassword: ''})); }}
-                      required
-                      maxLength={128}
-                      autoComplete="new-password"
-                      placeholder="Repeat your password"
-                      disabled={isWorking}
-                      aria-required="true"
-                      aria-describedby={fieldErrors.confirmPassword ? 'err-confirmPassword' : undefined}
-                      aria-invalid={!!fieldErrors.confirmPassword}
-                      className={`form-input ${fieldErrors.confirmPassword ? 'input-error' : ''}`}
-                    />
-                    <button
-                      type="button"
-                      className="btn-toggle-password"
-                      onClick={() => setShowConfirmPassword(s => !s)}
-                      aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                      title={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                    >
-                      {showConfirmPassword ? '🙈' : '👁️'}
-                    </button>
-                  </div>
-                  <FieldError id="err-confirmPassword" name="confirmPassword" />
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
+          <form onSubmit={handleSubmit} noValidate aria-labelledby="auth-heading" className="auth-form-body">
             <div className="form-field-group">
               <label htmlFor="login-email" className="form-field-label">
                 <span>Email address <span className="required" aria-hidden="true">*</span></span>
@@ -962,6 +1162,7 @@ function AuthForm({ onAuthenticated, busy, initialMode = 'login', onClose }) {
                 className="form-input"
               />
             </div>
+
             <div className="form-field-group">
               <label htmlFor="login-password" className="form-field-label">
                 <span>Password <span className="required" aria-hidden="true">*</span></span>
@@ -988,59 +1189,43 @@ function AuthForm({ onAuthenticated, busy, initialMode = 'login', onClose }) {
                   aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
                   title={showLoginPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showLoginPassword ? '🙈' : '👁️'}
+                  {showLoginPassword ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
               </div>
             </div>
-          </>
-        )}
 
-        <button
-          className="primary btn-submit-auth"
-          disabled={isWorking}
-          type="submit"
-          id="btn-auth-submit"
-        >
-          {isWorking ? (
-            <span className="btn-loading-content">
-              <Spinner />
-              <span>{register ? 'Creating account...' : 'Signing in...'}</span>
+            <button
+              className="primary btn-submit-auth"
+              disabled={isWorking}
+              type="submit"
+              id="btn-auth-submit"
+            >
+              {isWorking ? (
+                <span className="btn-loading-content">
+                  <Spinner />
+                  <span>Signing in...</span>
+                </span>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+          </form>
+
+          <div className="auth-footer-toggle">
+            <span>
+              New to Community Disaster Watch?{' '}
+              <button
+                className="auth-link-button"
+                type="button"
+                disabled={isWorking}
+                onClick={toggleMode}
+              >
+                Create Account
+              </button>
             </span>
-          ) : register ? (
-            'Create Account'
-          ) : (
-            'Sign In'
-          )}
-        </button>
-      </form>
-
-      <div className="auth-footer-toggle">
-        {register ? (
-          <span>
-            Already registered?{' '}
-            <button
-              className="auth-link-button"
-              type="button"
-              disabled={isWorking}
-              onClick={toggleMode}
-            >
-              Sign In
-            </button>
-          </span>
-        ) : (
-          <span>
-            New to Community Disaster Watch?{' '}
-            <button
-              className="auth-link-button"
-              type="button"
-              disabled={isWorking}
-              onClick={toggleMode}
-            >
-              Create Account
-            </button>
-          </span>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -3091,13 +3276,30 @@ function App() {
 
       {/* Auth Modal Overlay */}
       {authModal.open && (
-        <div className="auth-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="auth-heading" onClick={() => setAuthModal({ open: false, mode: 'login' })}>
-          <div className="auth-modal-container" onClick={e => e.stopPropagation()}>
-            <button className="auth-modal-close" onClick={() => setAuthModal({ open: false, mode: 'login' })} aria-label="Close dialog">✕</button>
+        <div
+          className="auth-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="auth-heading"
+          onClick={() => setAuthModal({ open: false, mode: 'login' })}
+          onKeyDown={e => { if (e.key === 'Escape') setAuthModal({ open: false, mode: 'login' }); }}
+        >
+          <div
+            className={`auth-modal-container ${authModal.mode === 'register' ? 'auth-modal-register-wide' : 'auth-modal-login-compact'}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              className="auth-modal-close"
+              onClick={() => setAuthModal({ open: false, mode: 'login' })}
+              aria-label="Close dialog"
+            >
+              ✕
+            </button>
             <AuthForm
               run={run}
               busy={busy}
               initialMode={authModal.mode}
+              onModeChange={mode => setAuthModal(m => ({ ...m, mode }))}
               onClose={() => setAuthModal({ open: false, mode: 'login' })}
               onAuthenticated={async u => {
                 try { if (u?.token) localStorage.setItem('cdw_token', u.token); } catch {}
